@@ -10,10 +10,10 @@ import os
 
 gi.require_version('Gtk','3.0')
 
-from gi.repository import Gtk as gtk
+from gi.repository import Gtk as gtk, GObject
+from gi.repository import GLib
 
-
-class Main():
+class Main(gtk.Window):
 
     def __init__(self):
 
@@ -23,11 +23,16 @@ class Main():
         #Read Chauffeur, Truck and Gateway IDs from gateway.txt file
         
         self.data_id =[]
-        with open("gateway.txt", 'r') as data_id:
-            for tline in data_id:
-                self.data_id.append(tline.split())
-        data_id.close()
-       
+        try:
+            with open("gateway.txt", 'r') as data_id:
+                for tline in data_id:
+                    self.data_id.append(tline.split())
+            data_id.close()
+        
+        except IOError:
+            print("When rading file, File is already locked by another process")
+            
+
         
         self.chauffeur_id ="" #"C120"
         self.truck_id = "" #"TI120"
@@ -77,7 +82,7 @@ class Main():
         if(door):   
             self.login_window.hide()
             self.main_window.show()
-            self.update_time()
+            #self.update_time()
             self.update_temperatures()
 
             self.entry_chauffeur.set_text("")
@@ -86,7 +91,9 @@ class Main():
             self.error_label.set_text("")
             
             # ---------------MAIN WINDOW--------------
-      
+            #To run same time trailer_temp_create.py file
+            #self.extProc = sp.Popen(['python','trailer_temp_create.py']) # runs trailer_temp_create.py
+
             #Show Chauffeur, Truck and Gateway IDs on main window
             cf_label = self.builder.get_object("label_chauffeur")
             truck_label = self.builder.get_object("label_truck")
@@ -102,8 +109,8 @@ class Main():
     
     #Function of Update date-time every 1 second, this function is thread!
     def update_time(self):
-        self.uptime = threading.Timer(1.0, self.update_time)
-        self.uptime.start()
+        #self.uptime = threading.Timer(1.0, self.update_time)
+        #self.uptime.start()
 
         x = datetime.datetime.now()
         self.time_label = self.builder.get_object("time_label")
@@ -112,13 +119,20 @@ class Main():
         self.time_ = x.strftime("%H:%M:%S")
         self.date_label.set_text(str(self.date_))
         self.time_label.set_text(str(self.time_))
+        return True
 
+    def startclocktimer(self):
+		#  this takes 2 args: (how often to update in millisec, the method to run)
+        GLib.timeout_add_seconds(1, self.update_time)
+        #GObject.timeout_add(1000, self.update_time)
+                
     
     #Update all temperature values every 6 seconds, this function is thread!
     def update_temperatures(self):
-        self.uptemp = threading.Timer(6.0, self.update_temperatures) #----Every 6 seconds temperatures will updated-----
-        self.uptemp.start()
+        #self.uptemp = threading.Timer(5.0, self.update_temperatures) #----Every 6 seconds temperatures will updated-----
+        #self.uptemp.start()
         
+     
         #Read temperatures and and their ID's from temperature.txt file
         path_to_file = 'temperature.txt'          
         self.temp_data =[]
@@ -133,7 +147,6 @@ class Main():
             print(prblm," something happend when reading file, ")   
         finally:
             file.close()
-
 
             # Temperature screen labels
         self.t_label_1 = self.builder.get_object("t_label_01")
@@ -217,24 +230,31 @@ class Main():
         except:
             print(self.time_ + " temperature list could not read!")
             print(self.temp_data) 
-        
-            
+        return True
+    
+    def starttempupdatetimer(self):
+		#  this takes 2 args: (how often to update in millisec, the method to run)
+        GLib.timeout_add_seconds(5, self.update_temperatures)        
 
     #Disconnect button - close all window and kill the threads
     def disconnect_app(self,widget):
-        self.uptime.cancel()
-        self.uptemp.cancel()
         sp.Popen.terminate(self.extProc) # closes the process trailer_temp_create.py
+        #self.uptime.cancel()
+        #self.uptemp.cancel()
+        
 
         self.login_window.show()
         self.main_window.hide()
     
     #Exit from app on login menu    
     def exit_app(self,widget):
+        sp.Popen.terminate(self.extProc) # closes the process trailer_temp_create.py
         self.login_window.close()
         self.main_window.close()
     
        
 if __name__ == '__main__':
     main = Main()
+    main.startclocktimer()
+    main.starttempupdatetimer()
     gtk.main()
